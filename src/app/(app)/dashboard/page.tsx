@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import {
+  ReceiptStatus,
+  DeliveryStatus,
+  TransferStatus,
+} from "@prisma/client";
 import { DashboardFilterBar } from "@/components/dashboard/DashboardFilterBar";
 import { KPICards } from "@/components/dashboard/KPICards";
 import {
@@ -10,6 +15,19 @@ import {
   DashboardDocument,
 } from "@/components/dashboard/RecentDocumentsTable";
 import React from "react";
+
+const RECEIPT_STATUSES = new Set(Object.values(ReceiptStatus));
+const DELIVERY_STATUSES = new Set(Object.values(DeliveryStatus));
+const TRANSFER_STATUSES = new Set(Object.values(TransferStatus));
+
+const isReceiptStatus = (status: string): status is ReceiptStatus =>
+  RECEIPT_STATUSES.has(status as ReceiptStatus);
+
+const isDeliveryStatus = (status: string): status is DeliveryStatus =>
+  DELIVERY_STATUSES.has(status as DeliveryStatus);
+
+const isTransferStatus = (status: string): status is TransferStatus =>
+  TRANSFER_STATUSES.has(status as TransferStatus);
 
 interface PageProps {
   searchParams: Promise<{
@@ -87,54 +105,60 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }).length;
 
   // KPI 3: Pending Receipts (status DRAFT or READY)
-  const receiptsWhere: any = {};
-  if (statusFilter) {
-    receiptsWhere.status = statusFilter;
-  } else {
-    receiptsWhere.status = { in: ["DRAFT", "READY"] };
+  let pendingReceipts = 0;
+  if (!docTypeFilter || docTypeFilter === "RECEIPT") {
+    if (!statusFilter || isReceiptStatus(statusFilter)) {
+      const receiptsWhere: any = {};
+      if (statusFilter) {
+        receiptsWhere.status = statusFilter;
+      } else {
+        receiptsWhere.status = { in: [ReceiptStatus.DRAFT, ReceiptStatus.READY] };
+      }
+      if (warehouseLocationIds) {
+        receiptsWhere.destinationLocationId = { in: warehouseLocationIds };
+      }
+      pendingReceipts = await prisma.receipt.count({ where: receiptsWhere });
+    }
   }
-  if (warehouseLocationIds) {
-    receiptsWhere.destinationLocationId = { in: warehouseLocationIds };
-  }
-  const pendingReceipts =
-    !docTypeFilter || docTypeFilter === "RECEIPT"
-      ? await prisma.receipt.count({ where: receiptsWhere })
-      : 0;
 
   // KPI 4: Pending Deliveries (status WAITING or READY)
-  const deliveriesWhere: any = {};
-  if (statusFilter) {
-    deliveriesWhere.status = statusFilter;
-  } else {
-    deliveriesWhere.status = { in: ["WAITING", "READY"] };
+  let pendingDeliveries = 0;
+  if (!docTypeFilter || docTypeFilter === "DELIVERY") {
+    if (!statusFilter || isDeliveryStatus(statusFilter)) {
+      const deliveriesWhere: any = {};
+      if (statusFilter) {
+        deliveriesWhere.status = statusFilter;
+      } else {
+        deliveriesWhere.status = { in: [DeliveryStatus.WAITING, DeliveryStatus.READY] };
+      }
+      if (warehouseLocationIds) {
+        deliveriesWhere.lines = {
+          some: { sourceLocationId: { in: warehouseLocationIds } },
+        };
+      }
+      pendingDeliveries = await prisma.deliveryOrder.count({ where: deliveriesWhere });
+    }
   }
-  if (warehouseLocationIds) {
-    deliveriesWhere.lines = {
-      some: { sourceLocationId: { in: warehouseLocationIds } },
-    };
-  }
-  const pendingDeliveries =
-    !docTypeFilter || docTypeFilter === "DELIVERY"
-      ? await prisma.deliveryOrder.count({ where: deliveriesWhere })
-      : 0;
 
   // KPI 5: Internal Transfers Scheduled (status DRAFT)
-  const transfersWhere: any = {};
-  if (statusFilter) {
-    transfersWhere.status = statusFilter;
-  } else {
-    transfersWhere.status = "DRAFT";
+  let scheduledTransfers = 0;
+  if (!docTypeFilter || docTypeFilter === "TRANSFER") {
+    if (!statusFilter || isTransferStatus(statusFilter)) {
+      const transfersWhere: any = {};
+      if (statusFilter) {
+        transfersWhere.status = statusFilter;
+      } else {
+        transfersWhere.status = TransferStatus.DRAFT;
+      }
+      if (warehouseLocationIds) {
+        transfersWhere.OR = [
+          { fromLocationId: { in: warehouseLocationIds } },
+          { toLocationId: { in: warehouseLocationIds } },
+        ];
+      }
+      scheduledTransfers = await prisma.transfer.count({ where: transfersWhere });
+    }
   }
-  if (warehouseLocationIds) {
-    transfersWhere.OR = [
-      { fromLocationId: { in: warehouseLocationIds } },
-      { toLocationId: { in: warehouseLocationIds } },
-    ];
-  }
-  const scheduledTransfers =
-    !docTypeFilter || docTypeFilter === "TRANSFER"
-      ? await prisma.transfer.count({ where: transfersWhere })
-      : 0;
 
   // 3. Smart Reorder Assistant: 14-day velocity from StockLedger
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
@@ -190,8 +214,21 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   // 4. Recent Documents: across all 4 types
   const recentDocs: DashboardDocument[] = [];
 
-  const shouldQueryType = (type: string) =>
-    !docTypeFilter || docTypeFilter === type;
+  const shouldQueryReceipts =
+    (!docTypeFilter || docTypeFilter === "RECEIPT") &&
+    (!statusFilter || isReceiptStatus(statusFilter));
+
+  const shouldQueryDeliveries =
+    (!docTypeFilter || docTypeFilter === "DELIVERY") &&
+    (!statusFilter || isDeliveryStatus(statusFilter));
+
+  const shouldQueryTransfers =
+    (!docTypeFilter || docTypeFilter === "TRANSFER") &&
+    (!statusFilter || isTransferStatus(statusFilter));
+
+  const shouldQueryAdjustments =
+    (!docTypeFilter || docTypeFilter === "ADJUSTMENT") &&
+    !statusFilter;
 
   const receiptSearchWhere = searchQuery
     ? {
@@ -236,121 +273,97 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       }
     : {};
 
+  const receiptWhere = shouldQueryReceipts
+    ? {
+        ...(statusFilter ? { status: statusFilter as ReceiptStatus } : {}),
+        ...(warehouseLocationIds
+          ? { destinationLocationId: { in: warehouseLocationIds } }
+          : {}),
+        ...receiptSearchWhere,
+      }
+    : null;
+
+  const deliveryWhere = shouldQueryDeliveries
+    ? {
+        ...(statusFilter ? { status: statusFilter as DeliveryStatus } : {}),
+        ...(warehouseLocationIds
+          ? {
+              lines: {
+                some: { sourceLocationId: { in: warehouseLocationIds } },
+              },
+            }
+          : {}),
+        ...deliverySearchWhere,
+      }
+    : null;
+
+  const transferWhere = shouldQueryTransfers
+    ? {
+        ...(statusFilter ? { status: statusFilter as TransferStatus } : {}),
+        ...(warehouseLocationIds
+          ? {
+              OR: [
+                { fromLocationId: { in: warehouseLocationIds } },
+                { toLocationId: { in: warehouseLocationIds } },
+              ],
+            }
+          : {}),
+        ...transferSearchWhere,
+      }
+    : null;
+
+  const adjustmentWhere = shouldQueryAdjustments
+    ? {
+        ...(warehouseLocationIds
+          ? { locationId: { in: warehouseLocationIds } }
+          : {}),
+        ...adjustmentSearchWhere,
+      }
+    : null;
+
   const [receipts, deliveries, transfers, adjustments] = await Promise.all([
-    shouldQueryType("RECEIPT")
+    receiptWhere
       ? prisma.receipt.findMany({
           take: 8,
           orderBy: { createdAt: "desc" },
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? { destinationLocationId: { in: warehouseLocationIds } }
-              : {}),
-            ...receiptSearchWhere,
-          },
+          where: receiptWhere,
         })
       : Promise.resolve([]),
-    shouldQueryType("DELIVERY")
+    deliveryWhere
       ? prisma.deliveryOrder.findMany({
           take: 8,
           orderBy: { createdAt: "desc" },
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? {
-                  lines: {
-                    some: { sourceLocationId: { in: warehouseLocationIds } },
-                  },
-                }
-              : {}),
-            ...deliverySearchWhere,
-          },
+          where: deliveryWhere,
         })
       : Promise.resolve([]),
-    shouldQueryType("TRANSFER")
+    transferWhere
       ? prisma.transfer.findMany({
           take: 8,
           orderBy: { createdAt: "desc" },
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? {
-                  OR: [
-                    { fromLocationId: { in: warehouseLocationIds } },
-                    { toLocationId: { in: warehouseLocationIds } },
-                  ],
-                }
-              : {}),
-            ...transferSearchWhere,
-          },
+          where: transferWhere,
         })
       : Promise.resolve([]),
-    shouldQueryType("ADJUSTMENT")
+    adjustmentWhere
       ? prisma.adjustment.findMany({
           take: 8,
           orderBy: { createdAt: "desc" },
-          where: {
-            ...(warehouseLocationIds
-              ? { locationId: { in: warehouseLocationIds } }
-              : {}),
-            ...adjustmentSearchWhere,
-          },
+          where: adjustmentWhere,
         })
       : Promise.resolve([]),
   ]);
 
   const [totalReceipts, totalDeliveries, totalTransfers, totalAdjustments] = await Promise.all([
-    shouldQueryType("RECEIPT")
-      ? prisma.receipt.count({
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? { destinationLocationId: { in: warehouseLocationIds } }
-              : {}),
-            ...receiptSearchWhere,
-          },
-        })
+    receiptWhere
+      ? prisma.receipt.count({ where: receiptWhere })
       : Promise.resolve(0),
-    shouldQueryType("DELIVERY")
-      ? prisma.deliveryOrder.count({
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? {
-                  lines: {
-                    some: { sourceLocationId: { in: warehouseLocationIds } },
-                  },
-                }
-              : {}),
-            ...deliverySearchWhere,
-          },
-        })
+    deliveryWhere
+      ? prisma.deliveryOrder.count({ where: deliveryWhere })
       : Promise.resolve(0),
-    shouldQueryType("TRANSFER")
-      ? prisma.transfer.count({
-          where: {
-            ...(statusFilter ? { status: statusFilter as any } : {}),
-            ...(warehouseLocationIds
-              ? {
-                  OR: [
-                    { fromLocationId: { in: warehouseLocationIds } },
-                    { toLocationId: { in: warehouseLocationIds } },
-                  ],
-                }
-              : {}),
-            ...transferSearchWhere,
-          },
-        })
+    transferWhere
+      ? prisma.transfer.count({ where: transferWhere })
       : Promise.resolve(0),
-    shouldQueryType("ADJUSTMENT")
-      ? prisma.adjustment.count({
-          where: {
-            ...(warehouseLocationIds
-              ? { locationId: { in: warehouseLocationIds } }
-              : {}),
-            ...adjustmentSearchWhere,
-          },
-        })
+    adjustmentWhere
+      ? prisma.adjustment.count({ where: adjustmentWhere })
       : Promise.resolve(0),
   ]);
 
