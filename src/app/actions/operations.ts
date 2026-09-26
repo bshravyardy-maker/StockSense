@@ -261,9 +261,33 @@ export async function markDeliveryWaiting(deliveryId: string) {
 
 export async function markDeliveryReady(deliveryId: string) {
   try {
-    const delivery = await prisma.deliveryOrder.findUnique({ where: { id: deliveryId } });
+    const delivery = await prisma.deliveryOrder.findUnique({
+      where: { id: deliveryId },
+      include: {
+        lines: {
+          include: { product: true },
+        },
+      },
+    });
     if (!delivery) return { error: "Delivery order not found." };
     if (delivery.status !== "WAITING") return { error: "Only WAITING orders can be marked as Ready." };
+
+    // Check if sufficient stock is available to mark as Ready
+    for (const line of delivery.lines) {
+      const stock = await prisma.stockLevel.findUnique({
+        where: {
+          productId_locationId: {
+            productId: line.productId,
+            locationId: line.sourceLocationId,
+          },
+        },
+      });
+      if ((stock?.quantity || 0) < line.quantity) {
+        return {
+          error: `Cannot mark Ready: Insufficient stock for ${line.product.name}. Available on hand: ${stock?.quantity || 0}, requested: ${line.quantity}.`,
+        };
+      }
+    }
 
     await prisma.deliveryOrder.update({ where: { id: deliveryId }, data: { status: "READY" } });
 
@@ -275,16 +299,37 @@ export async function markDeliveryReady(deliveryId: string) {
   }
 }
 
-
 export async function validateDelivery(deliveryId: string) {
   try {
     const delivery = await prisma.deliveryOrder.findUnique({
       where: { id: deliveryId },
-      include: { lines: true },
+      include: {
+        lines: {
+          include: { product: true },
+        },
+      },
     });
 
     if (!delivery) return { error: "Delivery order not found." };
     if (delivery.status !== "READY") return { error: "Only READY delivery orders can be validated and shipped. Advance the order through Waiting first." };
+
+    // Pre-check sufficient stock before running transaction to avoid negative stock
+    for (const line of delivery.lines) {
+      const currentStock = await prisma.stockLevel.findUnique({
+        where: {
+          productId_locationId: {
+            productId: line.productId,
+            locationId: line.sourceLocationId,
+          },
+        },
+      });
+
+      if ((currentStock?.quantity || 0) < line.quantity) {
+        return {
+          error: `Cannot validate delivery: Insufficient stock for ${line.product.name}. Available on hand: ${currentStock?.quantity || 0}, requested: ${line.quantity}.`,
+        };
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       // 1. Mark status DONE
@@ -303,6 +348,12 @@ export async function validateDelivery(deliveryId: string) {
             },
           },
         });
+
+        if ((currentStock?.quantity || 0) < line.quantity) {
+          throw new Error(
+            `Insufficient stock for ${line.product.name}. Available: ${currentStock?.quantity || 0}, requested: ${line.quantity}`
+          );
+        }
 
         const newQuantity = (currentStock?.quantity || 0) - line.quantity;
         const newReserved = Math.max(0, (currentStock?.reserved || 0) - line.quantity);
@@ -457,12 +508,33 @@ export async function validateTransfer(transferId: string) {
   try {
     const transfer = await prisma.transfer.findUnique({
       where: { id: transferId },
-      include: { lines: true },
+      include: {
+        lines: {
+          include: { product: true },
+        },
+      },
     });
 
     if (!transfer) return { error: "Transfer not found." };
     if (transfer.status === "DONE") return { error: "Transfer already completed." };
     if (transfer.status === "CANCELLED") return { error: "Cannot validate cancelled transfer." };
+
+    // Check available source stock
+    for (const line of transfer.lines) {
+      const srcStock = await prisma.stockLevel.findUnique({
+        where: {
+          productId_locationId: {
+            productId: line.productId,
+            locationId: transfer.fromLocationId,
+          },
+        },
+      });
+      if ((srcStock?.quantity || 0) < line.quantity) {
+        return {
+          error: `Cannot validate transfer: Insufficient stock for ${line.product.name} at source location. Available: ${srcStock?.quantity || 0}, requested: ${line.quantity}.`,
+        };
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       // 1. Mark status DONE
@@ -533,7 +605,7 @@ export async function validateTransfer(transferId: string) {
             locationId: transfer.fromLocationId,
             quantityChange: -line.quantity,
             balanceAfter: srcAfter,
-            notes: `Internal transfer out`,
+            notes: `Internal transfer out (${transfer.reference})`,
           },
         });
 
@@ -547,7 +619,7 @@ export async function validateTransfer(transferId: string) {
             locationId: transfer.toLocationId,
             quantityChange: line.quantity,
             balanceAfter: destAfter,
-            notes: `Internal transfer in`,
+            notes: `Internal transfer in (${transfer.reference})`,
           },
         });
       }
@@ -662,7 +734,9 @@ export async function createAdjustment(data: {
             locationId: data.locationId,
             quantityChange: diff,
             balanceAfter: newQty,
-            notes: data.notes || "Physical inventory count adjustment",
+            notes: data.notes
+              ? `${data.notes} (Count: ${previousQty} → ${newQty})`
+              : `Physical count adjustment: ${previousQty} → ${newQty} (delta ${diff >= 0 ? "+" : ""}${diff})`,
           },
         });
       }

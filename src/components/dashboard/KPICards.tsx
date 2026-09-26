@@ -32,7 +32,7 @@ export function KPICards({ data }: { data: KPIData }) {
     {
       title: "Pending Receipts",
       value: data.pendingReceipts,
-      subtitle: "Inbound orders in READY status",
+      subtitle: "Inbound orders in DRAFT or READY",
       indicatorColor: "bg-[var(--color-amber)]",
       badgeText: "Inbound",
       badgeStyle: "bg-[#FEF3D6] text-[#9A6214] border border-[#F9DE96]",

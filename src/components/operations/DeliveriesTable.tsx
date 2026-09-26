@@ -149,26 +149,38 @@ export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[
 
   const handleWaiting = (id: string) => {
     if (confirm("Confirm this delivery order and reserve stock?")) {
-      startTransition(async () => { await markDeliveryWaiting(id); });
+      startTransition(async () => {
+        const res = await markDeliveryWaiting(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
   const handleReady = (id: string) => {
-    startTransition(async () => { await markDeliveryReady(id); });
+    startTransition(async () => {
+      const res = await markDeliveryReady(id);
+      if (res?.error) alert(res.error);
+    });
   };
   const handleValidate = (id: string) => {
     if (confirm("Ship this delivery order, decrement stock, and mark as Done?")) {
-      startTransition(async () => { await validateDelivery(id); });
+      startTransition(async () => {
+        const res = await validateDelivery(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
   const handleCancel = (id: string) => {
     if (confirm("Cancel this delivery order and release any reserved stock?")) {
-      startTransition(async () => { await cancelDelivery(id); });
+      startTransition(async () => {
+        const res = await cancelDelivery(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
 
   // Check if any line exceeds available free-to-use stock
   const hasStockWarning = (d: DeliveryOrderItem) =>
-    d.lines.some((l) => l.quantity > l.freeToUse && d.status === "DRAFT");
+    d.lines.some((l) => l.quantity > l.freeToUse && d.status !== "DONE" && d.status !== "CANCELLED");
 
   return (
     <div>

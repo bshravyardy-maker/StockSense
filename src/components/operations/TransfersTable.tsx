@@ -28,7 +28,8 @@ export function TransfersTable({ transfers }: { transfers: TransferItem[] }) {
   const handleValidate = (id: string) => {
     if (confirm("Execute this internal transfer and move quantities between locations?")) {
       startTransition(async () => {
-        await validateTransfer(id);
+        const res = await validateTransfer(id);
+        if (res?.error) alert(res.error);
       });
     }
   };
@@ -36,7 +37,8 @@ export function TransfersTable({ transfers }: { transfers: TransferItem[] }) {
   const handleCancel = (id: string) => {
     if (confirm("Cancel this transfer?")) {
       startTransition(async () => {
-        await cancelTransfer(id);
+        const res = await cancelTransfer(id);
+        if (res?.error) alert(res.error);
       });
     }
   };

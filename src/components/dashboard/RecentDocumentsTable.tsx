@@ -11,9 +11,10 @@ export interface DashboardDocument {
 
 interface RecentDocumentsTableProps {
   documents: DashboardDocument[];
+  totalCount?: number;
 }
 
-export function RecentDocumentsTable({ documents }: RecentDocumentsTableProps) {
+export function RecentDocumentsTable({ documents, totalCount }: RecentDocumentsTableProps) {
   const getStatusBadge = (status: string) => {
     switch (status.toUpperCase()) {
       case "DONE":
@@ -47,6 +48,14 @@ export function RecentDocumentsTable({ documents }: RecentDocumentsTableProps) {
     }
   };
 
+  const actualTotal = totalCount !== undefined ? totalCount : documents.length;
+  const countLabel =
+    actualTotal === 0
+      ? "0 documents"
+      : actualTotal <= documents.length
+      ? `${documents.length} of ${actualTotal} shown`
+      : `${documents.length} of ${actualTotal} shown`;
+
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-md shadow-2xs overflow-hidden">
       <div className="px-5 py-4 border-b border-[var(--color-line)] flex items-center justify-between">
@@ -59,7 +68,7 @@ export function RecentDocumentsTable({ documents }: RecentDocumentsTableProps) {
           </p>
         </div>
         <span className="text-xs font-mono text-[var(--color-muted)]">
-          {documents.length} of 8 shown
+          {countLabel}
         </span>
       </div>
 

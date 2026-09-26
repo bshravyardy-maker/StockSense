@@ -25,7 +25,7 @@ export default function LoginPage() {
       setError("Incorrect login ID or password.");
       return;
     }
-    router.push("/dashboard");
+    window.location.href = "/dashboard";
   }
 
   return (

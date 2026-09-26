@@ -58,6 +58,15 @@ function ReceiptActions({
         <button
           type="button"
           disabled={isPending}
+          onClick={onValidate}
+          className="inline-flex items-center px-2 py-1 bg-[var(--color-green)] hover:bg-[#256841] text-white rounded text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50"
+          title="Validate receipt and add to stock"
+        >
+          Validate
+        </button>
+        <button
+          type="button"
+          disabled={isPending}
           onClick={onMarkReady}
           className="inline-flex items-center px-2 py-1 bg-[var(--color-amber)] hover:bg-[#A36718] text-white rounded text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50"
           title="Confirm receipt is ready to receive"
@@ -124,17 +133,26 @@ export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
 
   const handleMarkReady = (id: string) => {
     if (confirm("Mark this receipt as Ready to receive?")) {
-      startTransition(async () => { await markReceiptReady(id); });
+      startTransition(async () => {
+        const res = await markReceiptReady(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
   const handleValidate = (id: string) => {
     if (confirm("Validate this receipt and increase stock in destination location?")) {
-      startTransition(async () => { await validateReceipt(id); });
+      startTransition(async () => {
+        const res = await validateReceipt(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
   const handleCancel = (id: string) => {
     if (confirm("Cancel this receipt?")) {
-      startTransition(async () => { await cancelReceipt(id); });
+      startTransition(async () => {
+        const res = await cancelReceipt(id);
+        if (res?.error) alert(res.error);
+      });
     }
   };
 

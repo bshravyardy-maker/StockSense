@@ -86,12 +86,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     return totalStock <= p.reorderPoint;
   }).length;
 
-  // KPI 3: Pending Receipts (status READY)
+  // KPI 3: Pending Receipts (status DRAFT or READY)
   const receiptsWhere: any = {};
   if (statusFilter) {
     receiptsWhere.status = statusFilter;
   } else {
-    receiptsWhere.status = "READY";
+    receiptsWhere.status = { in: ["DRAFT", "READY"] };
   }
   if (warehouseLocationIds) {
     receiptsWhere.destinationLocationId = { in: warehouseLocationIds };
@@ -252,6 +252,59 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       : Promise.resolve([]),
   ]);
 
+  const [totalReceipts, totalDeliveries, totalTransfers, totalAdjustments] = await Promise.all([
+    shouldQueryType("RECEIPT")
+      ? prisma.receipt.count({
+          where: {
+            ...(statusFilter ? { status: statusFilter as any } : {}),
+            ...(warehouseLocationIds
+              ? { destinationLocationId: { in: warehouseLocationIds } }
+              : {}),
+          },
+        })
+      : Promise.resolve(0),
+    shouldQueryType("DELIVERY")
+      ? prisma.deliveryOrder.count({
+          where: {
+            ...(statusFilter ? { status: statusFilter as any } : {}),
+            ...(warehouseLocationIds
+              ? {
+                  lines: {
+                    some: { sourceLocationId: { in: warehouseLocationIds } },
+                  },
+                }
+              : {}),
+          },
+        })
+      : Promise.resolve(0),
+    shouldQueryType("TRANSFER")
+      ? prisma.transfer.count({
+          where: {
+            ...(statusFilter ? { status: statusFilter as any } : {}),
+            ...(warehouseLocationIds
+              ? {
+                  OR: [
+                    { fromLocationId: { in: warehouseLocationIds } },
+                    { toLocationId: { in: warehouseLocationIds } },
+                  ],
+                }
+              : {}),
+          },
+        })
+      : Promise.resolve(0),
+    shouldQueryType("ADJUSTMENT")
+      ? prisma.adjustment.count({
+          where: {
+            ...(warehouseLocationIds
+              ? { locationId: { in: warehouseLocationIds } }
+              : {}),
+          },
+        })
+      : Promise.resolve(0),
+  ]);
+
+  const totalDocumentsCount = totalReceipts + totalDeliveries + totalTransfers + totalAdjustments;
+
   for (const r of receipts) {
     recentDocs.push({
       id: r.id,
@@ -330,7 +383,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <ReorderAssistant flaggedProducts={flaggedProducts} />
 
       {/* Recent Documents Table */}
-      <RecentDocumentsTable documents={finalRecentDocs} />
+      <RecentDocumentsTable documents={finalRecentDocs} totalCount={totalDocumentsCount} />
     </div>
   );
 }
