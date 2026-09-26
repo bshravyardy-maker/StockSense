@@ -268,4 +268,3 @@ All palette values are CSS custom properties in [`src/app/globals.css`](./src/ap
 | `--color-muted` | `#6B7280` | Secondary text |
 | `--color-line` | `#DCDCD6` | Borders and dividers |
 
-Design constraints enforced throughout: no purple, no gradients, no `rounded-full` on interactive elements (max `rounded-md`), no fake metrics.
