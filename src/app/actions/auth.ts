@@ -3,12 +3,14 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { signIn } from "@/auth";
+import { signIn, auth } from "@/auth";
+import { revalidatePath } from "next/cache";
 
 const signupSchema = z.object({
   name: z.string().min(1, "Name is required"),
   loginId: z.string().min(3, "Enter a valid email or phone number"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(["MANAGER", "STAFF"]).optional().default("MANAGER"),
 });
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -18,11 +20,12 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
     name: formData.get("name"),
     loginId: formData.get("loginId"),
     password: formData.get("password"),
+    role: formData.get("role") || "MANAGER",
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
-  const { name, loginId, password } = parsed.data;
+  const { name, loginId, password, role } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { loginId } });
   if (existing) {
@@ -31,7 +34,7 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
 
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.create({
-    data: { name, loginId, passwordHash, role: "MANAGER" },
+    data: { name, loginId, passwordHash, role: role as "MANAGER" | "STAFF" },
   });
 
   await signIn("credentials", { loginId, password, redirect: false });
@@ -99,3 +102,28 @@ export async function resetPassword(formData: FormData): Promise<ActionResult> {
 
   return { ok: true };
 }
+
+export async function updateDisplayName(formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) {
+    return { ok: false, error: "Display name cannot be empty" };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { name },
+    });
+    revalidatePath("/profile");
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Failed to update profile name" };
+  }
+}
+

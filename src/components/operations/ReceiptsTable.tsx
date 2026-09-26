@@ -5,8 +5,9 @@ import {
   cancelReceipt,
   markReceiptReady,
 } from "@/app/actions/operations";
-import React, { useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { PrintDocumentModal, PrintableDocumentData } from "./PrintDocumentModal";
 
 export interface ReceiptItem {
   id: string;
@@ -45,12 +46,14 @@ function ReceiptActions({
   onMarkReady,
   onValidate,
   onCancel,
+  onPrint,
 }: {
   receipt: ReceiptItem;
   isPending: boolean;
   onMarkReady: () => void;
   onValidate: () => void;
   onCancel: () => void;
+  onPrint?: () => void;
 }) {
   if (receipt.status === "DRAFT") {
     return (
@@ -110,7 +113,24 @@ function ReceiptActions({
     );
   }
   if (receipt.status === "DONE") {
-    return <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">Received ✓</span>;
+    return (
+      <div className="inline-flex items-center space-x-2">
+        <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">Received ✓</span>
+        {onPrint && (
+          <button
+            type="button"
+            onClick={onPrint}
+            className="inline-flex items-center px-2 py-0.5 bg-white hover:bg-[#F4F4F2] text-[var(--color-ink)] rounded text-[11px] font-medium border border-[var(--color-line)] shadow-2xs transition-colors cursor-pointer"
+            title="Print receipt slip"
+          >
+            <svg className="w-3 h-3 mr-1 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+          </button>
+        )}
+      </div>
+    );
   }
   if (receipt.status === "CANCELLED") {
     return <span className="text-[11px] font-medium text-[var(--color-muted)]">Cancelled</span>;
@@ -120,6 +140,7 @@ function ReceiptActions({
 
 export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
   const [isPending, startTransition] = useTransition();
+  const [printingDoc, setPrintingDoc] = useState<PrintableDocumentData | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -129,6 +150,27 @@ export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", v);
     router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePrint = (r: ReceiptItem) => {
+    setPrintingDoc({
+      type: "RECEIPT",
+      reference: r.reference,
+      status: r.status,
+      date: r.createdAt,
+      details: [
+        { label: "Supplier", value: r.supplierName },
+        { label: "Destination Location", value: `${r.destinationLocationName} (${r.warehouseCode})` },
+        { label: "Scheduled Date", value: r.scheduleDate ? new Date(r.scheduleDate).toLocaleDateString() : "Immediate" },
+      ],
+      lines: r.lines.map((l) => ({
+        id: l.id,
+        productName: l.productName,
+        productSku: l.productSku,
+        quantity: l.quantity,
+        unitAbbr: l.unitAbbr,
+      })),
+    });
   };
 
   const handleMarkReady = (id: string) => {
@@ -225,6 +267,7 @@ export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
                               onMarkReady={() => handleMarkReady(r.id)}
                               onValidate={() => handleValidate(r.id)}
                               onCancel={() => handleCancel(r.id)}
+                              onPrint={() => handlePrint(r)}
                             />
                           </div>
                         </div>
@@ -294,6 +337,7 @@ export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
                             onMarkReady={() => handleMarkReady(r.id)}
                             onValidate={() => handleValidate(r.id)}
                             onCancel={() => handleCancel(r.id)}
+                            onPrint={() => handlePrint(r)}
                           />
                         </td>
                       </tr>
@@ -305,6 +349,12 @@ export function ReceiptsTable({ receipts }: { receipts: ReceiptItem[] }) {
           )}
         </div>
       )}
+
+      {/* Printable Document Modal */}
+      <PrintDocumentModal
+        document={printingDoc}
+        onClose={() => setPrintingDoc(null)}
+      />
     </div>
   );
 }

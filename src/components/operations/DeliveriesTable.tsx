@@ -6,8 +6,9 @@ import {
   markDeliveryWaiting,
   markDeliveryReady,
 } from "@/app/actions/operations";
-import React, { useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { PrintDocumentModal, PrintableDocumentData } from "./PrintDocumentModal";
 
 export interface DeliveryOrderItem {
   id: string;
@@ -48,6 +49,7 @@ function DeliveryActions({
   onReady,
   onValidate,
   onCancel,
+  onPrint,
 }: {
   delivery: DeliveryOrderItem;
   isPending: boolean;
@@ -55,6 +57,7 @@ function DeliveryActions({
   onReady: () => void;
   onValidate: () => void;
   onCancel: () => void;
+  onPrint?: () => void;
 }) {
   if (delivery.status === "DRAFT") {
     return (
@@ -126,7 +129,24 @@ function DeliveryActions({
     );
   }
   if (delivery.status === "DONE") {
-    return <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">Shipped ✓</span>;
+    return (
+      <div className="inline-flex items-center space-x-2">
+        <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">Shipped ✓</span>
+        {onPrint && (
+          <button
+            type="button"
+            onClick={onPrint}
+            className="inline-flex items-center px-2 py-0.5 bg-white hover:bg-[#F4F4F2] text-[var(--color-ink)] rounded text-[11px] font-medium border border-[var(--color-line)] shadow-2xs transition-colors cursor-pointer"
+            title="Print delivery note"
+          >
+            <svg className="w-3 h-3 mr-1 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+          </button>
+        )}
+      </div>
+    );
   }
   if (delivery.status === "CANCELLED") {
     return <span className="text-[11px] font-medium text-[var(--color-muted)]">Cancelled</span>;
@@ -136,6 +156,7 @@ function DeliveryActions({
 
 export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[] }) {
   const [isPending, startTransition] = useTransition();
+  const [printingDoc, setPrintingDoc] = useState<PrintableDocumentData | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -145,6 +166,27 @@ export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", v);
     router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const handlePrint = (d: DeliveryOrderItem) => {
+    setPrintingDoc({
+      type: "DELIVERY",
+      reference: d.reference,
+      status: d.status,
+      date: d.createdAt,
+      details: [
+        { label: "Destination / Customer", value: d.destinationAddress || "Dispatch Dock" },
+        { label: "Scheduled Date", value: d.scheduleDate ? new Date(d.scheduleDate).toLocaleDateString() : "Immediate" },
+      ],
+      lines: d.lines.map((l) => ({
+        id: l.id,
+        productName: l.productName,
+        productSku: l.productSku,
+        sourceLocation: `${l.sourceLocationName} (${l.warehouseCode})`,
+        quantity: l.quantity,
+        unitAbbr: l.unitAbbr,
+      })),
+    });
   };
 
   const handleWaiting = (id: string) => {
@@ -252,6 +294,7 @@ export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[
                               onReady={() => handleReady(d.id)}
                               onValidate={() => handleValidate(d.id)}
                               onCancel={() => handleCancel(d.id)}
+                              onPrint={() => handlePrint(d)}
                             />
                           </div>
                         </div>
@@ -326,6 +369,7 @@ export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[
                             onReady={() => handleReady(d.id)}
                             onValidate={() => handleValidate(d.id)}
                             onCancel={() => handleCancel(d.id)}
+                            onPrint={() => handlePrint(d)}
                           />
                         </td>
                       </tr>
@@ -337,6 +381,12 @@ export function DeliveriesTable({ deliveries }: { deliveries: DeliveryOrderItem[
           )}
         </div>
       )}
+
+      {/* Printable Document Modal */}
+      <PrintDocumentModal
+        document={printingDoc}
+        onClose={() => setPrintingDoc(null)}
+      />
     </div>
   );
 }

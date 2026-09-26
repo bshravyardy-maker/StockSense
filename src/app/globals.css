@@ -44,3 +44,23 @@ button {
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print,
+  aside,
+  header,
+  nav {
+    display: none !important;
+  }
+  #printable-document-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    width: 100% !important;
+  }
+}
+

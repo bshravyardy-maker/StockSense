@@ -252,19 +252,36 @@ export function Sidebar({ user }: SidebarProps) {
           </div>
         </div>
 
-        <div className="mt-2 pt-2 border-t border-[#252C36] flex items-center justify-between px-1">
-          <Link
-            href="/profile"
-            className="text-xs text-[#9CA3AF] hover:text-white px-2 py-1.5 rounded transition-colors"
-          >
-            My Profile
-          </Link>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="text-xs text-[#B23A34] hover:text-[#EF4444] px-2 py-1.5 rounded transition-colors font-medium cursor-pointer"
-          >
-            Logout
-          </button>
+        <div className="mt-2 pt-2 border-t border-[#252C36] space-y-1.5 px-1">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/profile"
+              className="text-xs text-[#9CA3AF] hover:text-white px-2 py-1 rounded transition-colors"
+            >
+              My Profile
+            </Link>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="text-xs text-[#B23A34] hover:text-[#EF4444] px-2 py-1 rounded transition-colors font-medium cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
+          <div className="flex items-center justify-between px-2 pt-1 border-t border-[#232932] text-[11px] text-[#737C8A]">
+            <Link
+              href="/privacy"
+              className="hover:text-[#CBD5E1] transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            <span>&middot;</span>
+            <Link
+              href="/terms"
+              className="hover:text-[#CBD5E1] transition-colors"
+            >
+              Terms
+            </Link>
+          </div>
         </div>
       </div>
     </aside>

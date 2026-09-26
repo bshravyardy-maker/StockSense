@@ -193,6 +193,49 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const shouldQueryType = (type: string) =>
     !docTypeFilter || docTypeFilter === type;
 
+  const receiptSearchWhere = searchQuery
+    ? {
+        OR: [
+          { reference: { contains: searchQuery, mode: "insensitive" as const } },
+          { supplier: { name: { contains: searchQuery, mode: "insensitive" as const } } },
+          { lines: { some: { product: { name: { contains: searchQuery, mode: "insensitive" as const } } } } },
+          { lines: { some: { product: { sku: { contains: searchQuery, mode: "insensitive" as const } } } } },
+        ],
+      }
+    : {};
+
+  const deliverySearchWhere = searchQuery
+    ? {
+        OR: [
+          { reference: { contains: searchQuery, mode: "insensitive" as const } },
+          { destinationAddress: { contains: searchQuery, mode: "insensitive" as const } },
+          { lines: { some: { product: { name: { contains: searchQuery, mode: "insensitive" as const } } } } },
+          { lines: { some: { product: { sku: { contains: searchQuery, mode: "insensitive" as const } } } } },
+        ],
+      }
+    : {};
+
+  const transferSearchWhere = searchQuery
+    ? {
+        OR: [
+          { reference: { contains: searchQuery, mode: "insensitive" as const } },
+          { lines: { some: { product: { name: { contains: searchQuery, mode: "insensitive" as const } } } } },
+          { lines: { some: { product: { sku: { contains: searchQuery, mode: "insensitive" as const } } } } },
+        ],
+      }
+    : {};
+
+  const adjustmentSearchWhere = searchQuery
+    ? {
+        OR: [
+          { reference: { contains: searchQuery, mode: "insensitive" as const } },
+          { notes: { contains: searchQuery, mode: "insensitive" as const } },
+          { lines: { some: { product: { name: { contains: searchQuery, mode: "insensitive" as const } } } } },
+          { lines: { some: { product: { sku: { contains: searchQuery, mode: "insensitive" as const } } } } },
+        ],
+      }
+    : {};
+
   const [receipts, deliveries, transfers, adjustments] = await Promise.all([
     shouldQueryType("RECEIPT")
       ? prisma.receipt.findMany({
@@ -203,6 +246,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             ...(warehouseLocationIds
               ? { destinationLocationId: { in: warehouseLocationIds } }
               : {}),
+            ...receiptSearchWhere,
           },
         })
       : Promise.resolve([]),
@@ -219,6 +263,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   },
                 }
               : {}),
+            ...deliverySearchWhere,
           },
         })
       : Promise.resolve([]),
@@ -236,6 +281,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   ],
                 }
               : {}),
+            ...transferSearchWhere,
           },
         })
       : Promise.resolve([]),
@@ -247,6 +293,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             ...(warehouseLocationIds
               ? { locationId: { in: warehouseLocationIds } }
               : {}),
+            ...adjustmentSearchWhere,
           },
         })
       : Promise.resolve([]),
@@ -260,6 +307,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             ...(warehouseLocationIds
               ? { destinationLocationId: { in: warehouseLocationIds } }
               : {}),
+            ...receiptSearchWhere,
           },
         })
       : Promise.resolve(0),
@@ -274,6 +322,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   },
                 }
               : {}),
+            ...deliverySearchWhere,
           },
         })
       : Promise.resolve(0),
@@ -289,6 +338,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   ],
                 }
               : {}),
+            ...transferSearchWhere,
           },
         })
       : Promise.resolve(0),
@@ -298,6 +348,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             ...(warehouseLocationIds
               ? { locationId: { in: warehouseLocationIds } }
               : {}),
+            ...adjustmentSearchWhere,
           },
         })
       : Promise.resolve(0),

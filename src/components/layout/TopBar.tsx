@@ -16,8 +16,7 @@ export function TopBar() {
     setSearchValue(currentQuery);
   }, [currentQuery]);
 
-  const handleSearch = (term: string) => {
-    setSearchValue(term);
+  const applySearch = (term: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (term.trim()) {
       params.set("q", term.trim());
@@ -27,12 +26,22 @@ export function TopBar() {
 
     startTransition(() => {
       const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-      router.replace(newUrl);
+      router.push(newUrl);
     });
   };
 
+  useEffect(() => {
+    if (searchValue === currentQuery) return;
+    const timer = setTimeout(() => {
+      applySearch(searchValue);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchValue, currentQuery, pathname]);
+
   const handleClear = () => {
-    handleSearch("");
+    setSearchValue("");
+    applySearch("");
   };
 
   return (
@@ -42,7 +51,7 @@ export function TopBar() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleSearch(searchValue);
+            applySearch(searchValue);
           }}
           className="relative"
         >
@@ -64,7 +73,13 @@ export function TopBar() {
           <input
             type="text"
             value={searchValue}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applySearch(searchValue);
+              }
+            }}
             placeholder="Global search by product name or SKU..."
             className="w-full pl-9 pr-9 py-2 text-sm bg-[#F8F9FA] border border-[var(--color-line)] rounded-md text-[var(--color-ink)] placeholder-[var(--color-muted)] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-amber)] focus:border-[var(--color-amber)] transition-colors"
           />

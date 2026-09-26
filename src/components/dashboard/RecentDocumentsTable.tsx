@@ -48,13 +48,12 @@ export function RecentDocumentsTable({ documents, totalCount }: RecentDocumentsT
     }
   };
 
-  const actualTotal = totalCount !== undefined ? totalCount : documents.length;
   const countLabel =
-    actualTotal === 0
-      ? "0 documents"
-      : actualTotal <= documents.length
-      ? `${documents.length} of ${actualTotal} shown`
-      : `${documents.length} of ${actualTotal} shown`;
+    documents.length === 0
+      ? "0 documents shown"
+      : totalCount && totalCount > documents.length
+      ? `${documents.length} of ${totalCount} shown`
+      : `${documents.length} document${documents.length === 1 ? "" : "s"} shown`;
 
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-md shadow-2xs overflow-hidden">

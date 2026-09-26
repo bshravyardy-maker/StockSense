@@ -1,4 +1,7 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
+import { PrintDocumentModal, PrintableDocumentData } from "./PrintDocumentModal";
 
 export interface AdjustmentItem {
   id: string;
@@ -19,6 +22,30 @@ export interface AdjustmentItem {
 }
 
 export function AdjustmentsTable({ adjustments }: { adjustments: AdjustmentItem[] }) {
+  const [printingDoc, setPrintingDoc] = useState<PrintableDocumentData | null>(null);
+
+  const handlePrint = (a: AdjustmentItem) => {
+    setPrintingDoc({
+      type: "ADJUSTMENT",
+      reference: a.reference,
+      status: "DONE",
+      date: a.createdAt,
+      details: [
+        { label: "Storage Location", value: `${a.locationName} (${a.warehouseCode})` },
+      ],
+      notes: a.notes,
+      lines: a.lines.map((l) => ({
+        id: l.id,
+        productName: l.productName,
+        productSku: l.productSku,
+        previousQty: l.previousQty,
+        newQty: l.newQty,
+        difference: l.difference,
+        unitAbbr: l.unitAbbr,
+      })),
+    });
+  };
+
   return (
     <div className="bg-white border border-[var(--color-line)] rounded-md shadow-2xs overflow-hidden">
       {adjustments.length === 0 ? (
@@ -37,6 +64,7 @@ export function AdjustmentsTable({ adjustments }: { adjustments: AdjustmentItem[
                 <th className="py-3 px-4">Line Variances</th>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-line)]">
@@ -88,12 +116,31 @@ export function AdjustmentsTable({ adjustments }: { adjustments: AdjustmentItem[
                       RECORDED
                     </span>
                   </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handlePrint(a)}
+                      className="inline-flex items-center px-2 py-0.5 bg-white hover:bg-[#F4F4F2] text-[var(--color-ink)] rounded text-[11px] font-medium border border-[var(--color-line)] shadow-2xs transition-colors cursor-pointer"
+                      title="Print adjustment voucher"
+                    >
+                      <svg className="w-3 h-3 mr-1 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Printable Document Modal */}
+      <PrintDocumentModal
+        document={printingDoc}
+        onClose={() => setPrintingDoc(null)}
+      />
     </div>
   );
 }

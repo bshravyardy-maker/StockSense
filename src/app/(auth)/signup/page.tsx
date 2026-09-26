@@ -31,6 +31,17 @@ export default function SignupPage() {
         <Field label="Full name" name="name" type="text" required />
         <Field label="Login ID (email or phone)" name="loginId" type="text" required />
         <Field label="Password (min 8 characters)" name="password" type="password" minLength={8} required />
+        <label className="block mb-4">
+          <span className="block text-xs text-[var(--color-muted)] mb-1">Operational Role</span>
+          <select
+            name="role"
+            defaultValue="MANAGER"
+            className="w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] cursor-pointer"
+          >
+            <option value="MANAGER">MANAGER (Full access including Settings)</option>
+            <option value="STAFF">STAFF (Operations & inventory only)</option>
+          </select>
+        </label>
         {error && <p className="text-sm text-[var(--color-red)] mb-4">{error}</p>}
         <Button type="submit" disabled={loading}>
           {loading ? "Creating account..." : "Create account"}

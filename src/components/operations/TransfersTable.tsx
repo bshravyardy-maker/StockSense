@@ -1,7 +1,8 @@
 "use client";
 
 import { validateTransfer, cancelTransfer } from "@/app/actions/operations";
-import React, { useTransition } from "react";
+import React, { useState, useTransition } from "react";
+import { PrintDocumentModal, PrintableDocumentData } from "./PrintDocumentModal";
 
 export interface TransferItem {
   id: string;
@@ -24,6 +25,28 @@ export interface TransferItem {
 
 export function TransfersTable({ transfers }: { transfers: TransferItem[] }) {
   const [isPending, startTransition] = useTransition();
+  const [printingDoc, setPrintingDoc] = useState<PrintableDocumentData | null>(null);
+
+  const handlePrint = (t: TransferItem) => {
+    setPrintingDoc({
+      type: "TRANSFER",
+      reference: t.reference,
+      status: t.status,
+      date: t.createdAt,
+      details: [
+        { label: "Source Location", value: `${t.fromLocationName} (${t.fromWarehouseCode})` },
+        { label: "Destination Location", value: `${t.toLocationName} (${t.toWarehouseCode})` },
+        { label: "Scheduled At", value: t.scheduledAt ? new Date(t.scheduledAt).toLocaleDateString() : "Immediate" },
+      ],
+      lines: t.lines.map((l) => ({
+        id: l.id,
+        productName: l.productName,
+        productSku: l.productSku,
+        quantity: l.quantity,
+        unitAbbr: l.unitAbbr,
+      })),
+    });
+  };
 
   const handleValidate = (id: string) => {
     if (confirm("Execute this internal transfer and move quantities between locations?")) {
@@ -147,9 +170,22 @@ export function TransfersTable({ transfers }: { transfers: TransferItem[] }) {
                         </>
                       )}
                       {t.status === "DONE" && (
-                        <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">
-                          Transferred ✓
-                        </span>
+                        <div className="inline-flex items-center space-x-2">
+                          <span className="text-[11px] font-medium text-[var(--color-green)] font-mono">
+                            Transferred ✓
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handlePrint(t)}
+                            className="inline-flex items-center px-2 py-0.5 bg-white hover:bg-[#F4F4F2] text-[var(--color-ink)] rounded text-[11px] font-medium border border-[var(--color-line)] shadow-2xs transition-colors cursor-pointer"
+                            title="Print transfer slip"
+                          >
+                            <svg className="w-3 h-3 mr-1 text-[var(--color-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Print
+                          </button>
+                        </div>
                       )}
                       {t.status === "CANCELLED" && (
                         <span className="text-[11px] font-medium text-[var(--color-muted)]">
@@ -164,6 +200,12 @@ export function TransfersTable({ transfers }: { transfers: TransferItem[] }) {
           </table>
         </div>
       )}
+
+      {/* Printable Document Modal */}
+      <PrintDocumentModal
+        document={printingDoc}
+        onClose={() => setPrintingDoc(null)}
+      />
     </div>
   );
 }
