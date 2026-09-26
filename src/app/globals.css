@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+  StockSense color system: industrial/warehouse operations palette.
+  Anthracite: primary surface, echoes steel shelving and factory floors.
+  Safety Amber: accent/CTA, the universal warehouse hazard/attention color.
+  Sage Green: success / stock increase.
+  Alert Red: danger / low stock / stock decrease.
+  No purple, no gradients, no pill-shaped controls anywhere in this app.
+*/
+:root {
+  --color-bg: #F4F4F2;
+  --color-surface: #FFFFFF;
+  --color-line: #DCDCD6;
+  --color-ink: #1B1E24;
+  --color-muted: #6B7280;
+  --color-anthracite: #1C2127;
+  --color-anthracite-dark: #12151A;
+  --color-amber: #B9791F;
+  --color-green: #2E7D4F;
+  --color-red: #B23A34;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
